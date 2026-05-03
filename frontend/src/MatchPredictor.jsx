@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 
 const SCORE_COLOR = (score) => {
   if (score >= 70) return { bg: "#EAF3DE", border: "#639922", text: "#27500A" };
