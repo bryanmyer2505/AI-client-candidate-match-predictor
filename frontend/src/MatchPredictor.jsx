@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 
-const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
+const API_BASE = "https://match-predictor-backend-zeta.vercel.app";
 
 const SCORE_COLOR = (score) => {
   if (score >= 70) return { bg: "#EAF3DE", border: "#639922", text: "#27500A" };
