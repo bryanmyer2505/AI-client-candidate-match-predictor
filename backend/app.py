@@ -5,16 +5,24 @@ import json
 import re
 import io
 import os
-import pdfplumber
-import docx
 
-from dotenv import load_dotenv
-load_dotenv()
+# File parsing libraries (optional - may not be available on all platforms)
+try:
+    import pdfplumber
+    HAS_PDF = True
+except ImportError:
+    HAS_PDF = False
+
+try:
+    import docx
+    HAS_DOCX = True
+except ImportError:
+    HAS_DOCX = False
 
 app = Flask(__name__)
 CORS(app)
 
-client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+client = Groq(api_key="YOUR_GROQ_API_KEY_HERE")
 
 MODEL = "llama-3.3-70b-versatile"
 
@@ -59,6 +67,8 @@ def extract_text(file) -> str:
         return raw.decode("utf-8", errors="ignore")
 
     elif filename.endswith(".pdf"):
+        if not HAS_PDF:
+            raise ValueError("PDF parsing is not available on this server. Please paste text instead.")
         text_parts = []
         with pdfplumber.open(io.BytesIO(raw)) as pdf:
             for page in pdf.pages:
@@ -68,6 +78,8 @@ def extract_text(file) -> str:
         return "\n".join(text_parts)
 
     elif filename.endswith(".docx") or filename.endswith(".doc"):
+        if not HAS_DOCX:
+            raise ValueError("DOCX parsing is not available on this server. Please paste text instead.")
         doc = docx.Document(io.BytesIO(raw))
         return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
 
