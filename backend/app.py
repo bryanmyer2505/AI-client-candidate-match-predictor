@@ -20,7 +20,7 @@ except ImportError:
     HAS_DOCX = False
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=["https://ai-client-candidate-match-predictor.vercel.app", "http://localhost:3000"])
 
 client = Groq(api_key="YOUR_GROQ_API_KEY_HERE")
 
