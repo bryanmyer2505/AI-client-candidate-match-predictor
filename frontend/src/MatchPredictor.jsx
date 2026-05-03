@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 
-const API_BASE = "https://macth-predictor-backend.vercel.app";
+const API_BASE = "";
 
 const SCORE_COLOR = (score) => {
   if (score >= 70) return { bg: "#EAF3DE", border: "#639922", text: "#27500A" };
