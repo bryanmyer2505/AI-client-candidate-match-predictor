@@ -112,22 +112,19 @@ export default function MatchPredictor() {
     const hasClient = clientText.trim() || clientFile;
 
     if (!hasCandidate || !hasClient) {
-      setError("Please provide both a candidate profile and client requirements (text or file).");
+      setError("Please provide both a candidate profile and client requirements.");
       return;
     }
 
     setLoading(true);
     try {
-      const formData = new FormData();
-      if (candidateFile) formData.append("candidate_file", candidateFile);
-      else formData.append("candidate_profile", candidateText);
-
-      if (clientFile) formData.append("client_file", clientFile);
-      else formData.append("client_requirements", clientText);
-
-      const res = await fetch(`${API_BASE}/api/analyze`, {
+      const res = await fetch(`/api/analyze`, {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          candidate_profile: candidateText,
+          client_requirements: clientText,
+        }),
       });
 
       const data = await res.json();
