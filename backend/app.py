@@ -1,21 +1,22 @@
-from flask import Flask, request, jsonify, make_response
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from groq import Groq
+from dotenv import load_dotenv
 import json
 import re
 import io
 import os
-from groq import Groq
-from dotenv import load_dotenv
 
 load_dotenv()
 
 app = Flask(__name__)
+CORS(app)
 
-# Groq client
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
 MODEL = "llama-3.3-70b-versatile"
 
-# File parsing libraries (optional)
+# Optional file parsing libraries
 try:
     import pdfplumber
     HAS_PDF = True
@@ -60,24 +61,21 @@ Return ONLY this JSON structure:
 }}"""
 
 
-def cors_response(data, status=200):
-    """Wrap any response with CORS headers."""
-    response = make_response(jsonify(data), status)
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-    return response
+def parse_json(text: str) -> dict:
+    clean = re.sub(r"```(?:json)?", "", text).strip()
+    return json.loads(clean)
 
 
-def extract_text(file) -> str:
+def extract_text_from_file(file) -> str:
     filename = file.filename.lower()
     raw = file.read()
 
     if filename.endswith(".txt"):
         return raw.decode("utf-8", errors="ignore")
+
     elif filename.endswith(".pdf"):
         if not HAS_PDF:
-            raise ValueError("PDF parsing not available. Please paste text instead.")
+            raise ValueError("PDF parsing not available on this server. Please paste text instead.")
         text_parts = []
         with pdfplumber.open(io.BytesIO(raw)) as pdf:
             for page in pdf.pages:
@@ -85,67 +83,66 @@ def extract_text(file) -> str:
                 if t:
                     text_parts.append(t)
         return "\n".join(text_parts)
+
     elif filename.endswith(".docx") or filename.endswith(".doc"):
         if not HAS_DOCX:
-            raise ValueError("DOCX parsing not available. Please paste text instead.")
-        doc = docx.Document(io.BytesIO(raw))
-        return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+            raise ValueError("DOCX parsing not available on this server. Please paste text instead.")
+        document = docx.Document(io.BytesIO(raw))
+        return "\n".join(p.text for p in document.paragraphs if p.text.strip())
+
     else:
         raise ValueError(f"Unsupported file type: {filename}")
 
 
-def parse_json(text: str) -> dict:
-    clean = re.sub(r"```(?:json)?", "", text).strip()
-    return json.loads(clean)
-
-
-@app.route("/api/health", methods=["GET", "OPTIONS"])
+@app.route("/api/health", methods=["GET"])
 def health():
+    return jsonify({
+        "status": "ok",
+        "model": MODEL,
+        "pdf_support": HAS_PDF,
+        "docx_support": HAS_DOCX
+    })
+
+
+@app.route("/api/parse-file", methods=["POST", "OPTIONS"])
+def parse_file():
+    """Parse uploaded file and return extracted text."""
     if request.method == "OPTIONS":
-        return cors_response({"ok": True})
-    return cors_response({"status": "ok", "model": MODEL})
+        return jsonify({"ok": True})
+
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided"}), 400
+
+    file = request.files["file"]
+    if not file.filename:
+        return jsonify({"error": "Empty file"}), 400
+
+    try:
+        text = extract_text_from_file(file)
+        if not text.strip():
+            return jsonify({"error": "Could not extract text from file. Please paste text instead."}), 422
+        return jsonify({"text": text})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 422
+    except Exception as e:
+        return jsonify({"error": f"File parsing failed: {str(e)}"}), 500
 
 
 @app.route("/api/analyze", methods=["POST", "OPTIONS"])
 def analyze():
-    # Handle preflight OPTIONS request
+    """Analyze candidate-client match."""
     if request.method == "OPTIONS":
-        return cors_response({"ok": True})
+        return jsonify({"ok": True})
 
-    candidate = ""
-    client_req = ""
-
-    if request.content_type and "multipart/form-data" in request.content_type:
-        candidate = (request.form.get("candidate_profile") or "").strip()
-        client_req = (request.form.get("client_requirements") or "").strip()
-
-        if "candidate_file" in request.files:
-            f = request.files["candidate_file"]
-            if f.filename:
-                try:
-                    candidate = extract_text(f)
-                except ValueError as e:
-                    return cors_response({"error": str(e)}, 422)
-
-        if "client_file" in request.files:
-            f = request.files["client_file"]
-            if f.filename:
-                try:
-                    client_req = extract_text(f)
-                except ValueError as e:
-                    return cors_response({"error": str(e)}, 422)
-    else:
-        body = request.get_json(silent=True) or {}
-        candidate = (body.get("candidate_profile") or "").strip()
-        client_req = (body.get("client_requirements") or "").strip()
+    body = request.get_json(silent=True) or {}
+    candidate = (body.get("candidate_profile") or "").strip()
+    client_req = (body.get("client_requirements") or "").strip()
 
     if not candidate or not client_req:
-        return cors_response({
-            "error": "Both candidate profile and client requirements are required"
-        }, 422)
+        return jsonify({"error": "Both 'candidate_profile' and 'client_requirements' are required"}), 422
 
     if len(candidate) > 8000 or len(client_req) > 8000:
-        return cors_response({"error": "Input exceeds 8,000 character limit"}, 422)
+        return jsonify({"error": "Input exceeds 8,000 character limit per field"}), 422
 
     try:
         completion = client.chat.completions.create(
@@ -163,15 +160,15 @@ def analyze():
 
         raw_text = completion.choices[0].message.content
         result = parse_json(raw_text)
-        return cors_response(result)
+        return jsonify(result)
 
     except json.JSONDecodeError as e:
-        return cors_response({"error": f"Failed to parse model response: {str(e)}"}, 502)
+        return jsonify({"error": f"Failed to parse model response: {str(e)}"}), 502
 
     except Exception as e:
-        return cors_response({"error": f"Unexpected error: {str(e)}"}, 500)
+        return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
 
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(debug=False, host="0.0.0.0", port=port)
+    app.run(debug=True, host="0.0.0.0", port=port)
