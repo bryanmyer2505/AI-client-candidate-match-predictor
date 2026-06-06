@@ -41,11 +41,48 @@ Candidate Profile:
 Client Requirements:
 {client}
 
+Carefully extract and evaluate the following from the candidate profile before scoring:
+
+EDUCATION GATING:
+- What is the candidate's highest level of education? (e.g. Bachelor's, Master's, PhD, Diploma, High School)
+- What is their field of study? Is it relevant to the role?
+- Does it meet the client's education requirements (if stated)?
+
+EXPERIENCE GATING:
+- How many years of relevant work experience does the candidate have?
+- What roles or industries have they worked in?
+- Does their experience level meet the client's requirements (if stated)?
+
+CERTIFICATION GATING:
+- Does the candidate hold any certifications relevant to this role?
+- If the client requires specific certifications, does the candidate have them?
+- If no certifications are mentioned, note it as "None mentioned"
+
+Use the above gating to inform and justify your scores. Do not give high scores if the candidate 
+clearly fails a gating requirement (e.g. requires 5 years experience but candidate has 1 year).
+
 Return ONLY this JSON structure:
 {{
   "overall_score": <integer 0-100>,
   "verdict": "<3-5 word verdict e.g. 'Strong potential fit'>",
-  "summary": "<1-2 sentence overall assessment>",
+  "summary": "<2-3 sentence overall assessment referencing education, experience, and certifications>",
+  "gating": {{
+    "education": {{
+      "detected": "<what was found in the profile e.g. 'Bachelor of Computer Science, BINUS University'>",
+      "meets_requirement": <true or false>,
+      "note": "<1 sentence explanation>"
+    }},
+    "experience": {{
+      "detected": "<what was found e.g. '1 year as AI Engineer Intern'>",
+      "meets_requirement": <true or false>,
+      "note": "<1 sentence explanation>"
+    }},
+    "certifications": {{
+      "detected": "<list certifications found or 'None mentioned'>",
+      "meets_requirement": <true or false>,
+      "note": "<1 sentence explanation>"
+    }}
+  }},
   "dimensions": [
     {{"label": "Technical skills", "score": <0-100>}},
     {{"label": "Communication style", "score": <0-100>}},
@@ -106,7 +143,6 @@ def health():
 
 @app.route("/api/parse-file", methods=["POST", "OPTIONS"])
 def parse_file():
-    """Parse uploaded file and return extracted text."""
     if request.method == "OPTIONS":
         return jsonify({"ok": True})
 
@@ -130,7 +166,6 @@ def parse_file():
 
 @app.route("/api/analyze", methods=["POST", "OPTIONS"])
 def analyze():
-    """Analyze candidate-client match."""
     if request.method == "OPTIONS":
         return jsonify({"ok": True})
 
@@ -155,7 +190,7 @@ def analyze():
                 )}
             ],
             temperature=0.3,
-            max_tokens=1024,
+            max_tokens=1500,
         )
 
         raw_text = completion.choices[0].message.content

@@ -21,6 +21,35 @@ function readFileAsText(file) {
   });
 }
 
+// ---------- Gating Card ----------
+function GatingCard({ icon, title, detected, meets, note }) {
+  const pass = meets === true;
+  const color = pass ? "#27500A" : "#501313";
+  const bg = pass ? "#EAF3DE" : "#FCEBEB";
+  const border = pass ? "#639922" : "#A32D2D";
+
+  return (
+    <div style={{ background: "#fafafa", border: "0.5px solid #e8e8e8", borderRadius: 10, padding: "12px 14px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 16 }}>{icon}</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "#444", textTransform: "uppercase", letterSpacing: "0.6px" }}>{title}</span>
+        </div>
+        <span style={{
+          fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20,
+          background: bg, color: color, border: `0.5px solid ${border}`
+        }}>
+          {pass ? "✓ Meets" : "✗ Gap"}
+        </span>
+      </div>
+      <p style={{ fontSize: 12, color: "#555", margin: "4px 0 2px", fontStyle: "italic" }}>
+        {detected}
+      </p>
+      <p style={{ fontSize: 12, color: "#888", margin: 0 }}>{note}</p>
+    </div>
+  );
+}
+
 // ---------- Input Panel ----------
 function InputPanel({ label, value, onChange, placeholder }) {
   const [mode, setMode] = useState("text");
@@ -36,14 +65,12 @@ function InputPanel({ label, value, onChange, placeholder }) {
     }
     setFileName(file.name);
 
-    // For TXT files, read directly in browser
     if (ext.endsWith(".txt")) {
       const text = await readFileAsText(file);
       onChange(text);
       return;
     }
 
-    // For PDF/DOCX, send to backend for parsing
     const formData = new FormData();
     formData.append("file", file);
     try {
@@ -141,7 +168,6 @@ function InputPanel({ label, value, onChange, placeholder }) {
         </div>
       )}
 
-      {/* Show extracted text preview when file is uploaded */}
       {mode === "file" && value && (
         <div style={{ marginTop: 8, padding: 8, background: "#f0f7ff", borderRadius: 6, fontSize: 12, color: "#555", maxHeight: 80, overflow: "hidden" }}>
           <span style={{ color: "#185FA5", fontWeight: 600 }}>✓ Text extracted · </span>
@@ -240,6 +266,7 @@ export default function MatchPredictor() {
 
       {result && (
         <div style={{ background: "#fff", border: "0.5px solid #e0e0e0", borderRadius: 12, padding: "1.5rem" }}>
+
           {/* Score row */}
           <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: "1.5rem", paddingBottom: "1.5rem", borderBottom: "0.5px solid #f0f0f0" }}>
             <div style={{
@@ -255,6 +282,38 @@ export default function MatchPredictor() {
               <p style={{ fontSize: 13, color: "#666", lineHeight: 1.5 }}>{result.summary}</p>
             </div>
           </div>
+
+          {/* Gating section */}
+          {result.gating && (
+            <>
+              <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.8px", textTransform: "uppercase", color: "#888", marginBottom: 10 }}>
+                Qualification gating
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: "1.5rem" }}>
+                <GatingCard
+                  icon="🎓"
+                  title="Education"
+                  detected={result.gating.education?.detected}
+                  meets={result.gating.education?.meets_requirement}
+                  note={result.gating.education?.note}
+                />
+                <GatingCard
+                  icon="💼"
+                  title="Experience"
+                  detected={result.gating.experience?.detected}
+                  meets={result.gating.experience?.meets_requirement}
+                  note={result.gating.experience?.note}
+                />
+                <GatingCard
+                  icon="📜"
+                  title="Certifications"
+                  detected={result.gating.certifications?.detected}
+                  meets={result.gating.certifications?.meets_requirement}
+                  note={result.gating.certifications?.note}
+                />
+              </div>
+            </>
+          )}
 
           {/* Dimensions */}
           <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.8px", textTransform: "uppercase", color: "#888", marginBottom: 10 }}>
